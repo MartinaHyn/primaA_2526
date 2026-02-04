@@ -1,0 +1,88 @@
+
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Clicker hra</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #222;
+            color: white;
+        }
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        .obchod {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🖱️ Clicker hra</h1>
+    <h2>Body: <span id="body">0</span></h2>
+
+    <button onclick="klik()">Klikni!</button>
+
+    <div class="obchod">
+        <h3>🛒 Obchod</h3>
+        <button onclick="kupUpgrade()">
+            Vylepšení (+1 bod/klik) – Cena: <span id="cenaUpgrade">10</span>
+        </button>
+        <br><br>
+        <button onclick="kupAutoKlik()">
+            Auto-klik (+1 bod/s) – Cena: <span id="cenaAuto">50</span>
+        </button>
+    </div>
+
+    <script>
+        let body = 0;
+        let bodyZaKlik = 1;
+        let autoKliky = 0;
+        let cenaUpgrade = 10;
+        let cenaAuto = 50;
+
+        function klik() {
+            body += bodyZaKlik;
+            aktualizuj();
+        }
+
+        function kupUpgrade() {
+            if (body >= cenaUpgrade) {
+                body -= cenaUpgrade;
+                bodyZaKlik++;
+                cenaUpgrade = Math.floor(cenaUpgrade * 1.5);
+                aktualizuj();
+            }
+        }
+
+        function kupAutoKlik() {
+            if (body >= cenaAuto) {
+                body -= cenaAuto;
+                autoKliky++;
+                cenaAuto = Math.floor(cenaAuto * 1.7);
+                aktualizuj();
+            }
+        }
+
+        function aktualizuj() {
+            document.getElementById("body").innerText = body;
+            document.getElementById("cenaUpgrade").innerText = cenaUpgrade;
+            document.getElementById("cenaAuto").innerText = cenaAuto;
+        }
+
+        setInterval(() => {
+            body += autoKliky;
+   
+         aktualizuj();
+        }, 1000);
+    </script>
+
+</body>
+</html>

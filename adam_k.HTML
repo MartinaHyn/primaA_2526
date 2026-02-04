@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stickman Fight</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    canvas {
+      background: #222;
+      display: block;
+      margin: 20px auto;
+      border: 2px solid #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Stickman Fight</h1>
+  <p>Hráč 1: A/D – pohyb, W – skok, F – útok | Hráč 2: ←/→ – pohyb, ↑ – skok, L – útok</p>
+  <p id="info"></p>
+  <canvas id="game" width="900" height="400"></canvas>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const info = document.getElementById("info");
+
+    const GRAVITY = 0.7;
+    const FLOOR_Y = 340;
+
+    class Fighter {
+      constructor(x, color, leftKeys, rightKeys, jumpKey, attackKey, facing) {
+        this.x = x;
+        this.y = FLOOR_Y;
+        this.vx = 0;
+        this.vy = 0;
+        this.width = 30;
+        this.height = 80;
+        this.color = color;
+        this.speed = 4;
+        this.jumpPower = -12;
+        this.onGround = true;
+        this.health = 100;
+        this.isAttacking = false;
+        this.attackTimer = 0;
+        this.attackDuration = 200; // ms
+        this.facing = facing; // 1 = doprava, -1 = doleva
+
+        this.leftKey = leftKeys;
+        this.rightKey = rightKeys;
+        this.jumpKey = jumpKey;
+        this.attackKey = attackKey;
+
+        this.keys = {
+          left: false,
+          right: false,
+          jump: false,
+          attack: false
+        };
+      }
+
+      update(dt) {
+        // horizontální pohyb
+        this.vx = 0;
+        if (this.keys.left) {
+          this.vx = -this.speed;
+          this.facing = -1;
+        }
+        if (this.keys.right) {
+          this.vx = this.speed;
+          this.facing = 1;
+        }
+
+        // skok
+        if (this.keys.jump && this.onGround) {
+          this.vy = this.jumpPower;
+          this.onGround = false;
+        }
+
+        // gravitace
+        this.vy += GRAVITY;
+
+        // aplikace pohybu
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // podlaha
+        if (this.y >= FLOOR_Y) {
+          this.y = FLOOR_Y;
+          this.vy = 0;
+          this.onGround = true;
+        }
+
+        // hranice plátna
+        if (this.x < 20) this.x = 20;
+        if (this.x > canvas.width - 20) this.x = canvas.width - 20;
+
+        // útok – časování
+        if (this.isAttacking) {
+          this.attackTimer -= dt;
+          if (this.attackTimer <= 0) {
+            this.isAttacking = false;
+          }
+        }
+      }
+
+      attack() {
+        if (!this.isAttacking) {
+          this.isAttacking = true;
+          this.attackTimer = this.attackDuration;
+        }
+      }
+
+      draw() {
+        // tělo (čára)
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 4;
+
+        // hlava
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - this.height, 12, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // tělo
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - this.height + 12);
+        ctx.lineTo(this.x, this.y - 20);
+        ctx.stroke();
+
+        // nohy
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - 20);
+        ctx.lineTo(this.x - 15, this.y);
+        ctx.moveTo(this.x, this.y - 20);
+        ctx.lineTo(this.x + 15, this.y);
+        ctx.stroke();
+
+        // ruce
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - this.height + 25);
+        ctx.lineTo(this.x - 20, this.y - this.height + 40);
+        ctx.moveTo(this.x, this.y - this.height + 25);
+        ctx.lineTo(this.x + 20, this.y - this.height + 40);
+        ctx.stroke();
+
+        // jednoduchý „meč“ / pěst při útoku
+        if (this.isAttacking) {
+          ctx.beginPath();
+          const armY = this.y - this.height + 35;
+          const armX = this.x + this.facing * 20;
+          ctx.moveTo(armX, armY);
+          ctx.lineTo(armX + this.facing * 25, armY - 5);
+          ctx.stroke();
+        }
+
+        // životy
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - 30, this.y - this.height - 30, (this.health / 100) * 60, 6);
+        ctx.strokeStyle = "#fff";
+        ctx.strokeRect(this.x - 30, this.y - this.height - 30, 60, 6);
+      }
+
+      getHitbox() {
+        return {
+          x: this.x - 15,
+          y: this.y - this.height,
+          w: 30,
+          h: this.height
+        };
+      }
+
+      getAttackHitbox() {
+        if (!this.isAttacking) return null;
+        const range = 40;
+        const hbWidth = 30;
+        const hbHeight = 40;
+        return {
+          x: this.x + this.facing * range - hbWidth / 2,
+          y: this.y - this.height + 20,
+          w: hbWidth,
+          h: hbHeight
+        };
+      }
+    }
+
+    const p1 = new Fighter(
+      200,
+      "#4CAF50",
+      "KeyA",
+      "KeyD",
+      "KeyW",
+      "KeyF",
+      1
+    );
+    const p2 = new Fighter(
+      700,
+      "#FF5252",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "KeyL",
+      -1
+    );
+
+    let lastTime = performance.now();
+    let gameOver = false;
+
+    function rectsIntersect(a, b) {
+      return !(
+        a.x + a.w < b.x ||
+        a.x > b.x + b.w ||
+        a.y + a.h < b.y ||
+        a.y > b.y + b.h
+      );
+    }
+
+    function update(dt) {
+      if (gameOver) return;
+
+      p1.update(dt);
+      p2.update(dt);
+
+      // kolize útoků
+      const p1Atk = p1.getAttackHitbox();
+      const p2Atk = p2.getAttackHitbox();
+      const p1Body = p1.getHitbox();
+      const p2Body = p2.getHitbox();
+
+      if (p1Atk && rectsIntersect(p1Atk, p2Body)) {
+        p2.health -= 0.2 * dt; // dmg podle času
+      }
+      if (p2Atk && rectsIntersect(p2Atk, p1Body)) {
+        p1.health -= 0.2 * dt;
+      }
+
+      if (p1.health <= 0 || p2.health <= 0) {
+        gameOver = true;
+        if (p1.health <= 0 && p2.health <= 0) {
+          info.textContent = "Remíza!";
+        } else if (p1.health <= 0) {
+          info.textContent = "Vyhrál Hráč 2!";
+        } else {
+          info.textContent = "Vyhrál Hráč 1!";
+        }
+      } else {
+        info.textContent = "";
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // podlaha
+      ctx.strokeStyle = "#555";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, FLOOR_Y + 2);
+      ctx.lineTo(canvas.width, FLOOR_Y + 2);
+      ctx.stroke();
+
+      p1.draw();
+      p2.draw();
+    }
+
+    function loop(timestamp) {
+      const dt = timestamp - lastTime;
+      lastTime = timestamp;
+
+      update(dt);
+      draw();
+
+      requestAnimationFrame(loop);
+    }
+
+    // ovlád

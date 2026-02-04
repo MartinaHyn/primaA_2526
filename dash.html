@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Geometry Dash s cílem</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    canvas {
+      background: #222;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="game" width="800" height="300"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// ---- PLAYER ----
+const player = {
+  x: 80,
+  y: 220,
+  size: 30,
+  vy: 0
+};
+
+const gravity = 0.6;
+const jumpPower = -10;
+let isJumping = false;
+
+// ---- GAME ----
+let obstacles = [];
+let frame = 0;
+let speed = 4;
+let gameOver = false;
+
+// ---- FINISH ----
+const finish = {
+  x: 2500, // délka levelu
+  y: 190,
+  width: 20,
+  height: 80
+};
+
+// ---- CONTROLS ----
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && !isJumping) {
+    player.vy = jumpPower;
+    isJumping = true;
+  }
+});
+
+// ---- OBSTACLES ----
+function spawnObstacle() {
+  obstacles.push({
+    x: canvas.width,
+    y: 230,
+    width: 30,
+    height: 30
+  });
+}
+
+// ---- UPDATE ----
+function update() {
+  if (gameOver) return;
+  frame++;
+
+  // Player physics
+  player.vy += gravity;
+  player.y += player.vy;
+
+  if (player.y >= 220) {
+    player.y = 220;
+    player.vy = 0;
+    isJumping = false;
+  }
+
+  // Obstacles
+  if (frame % 120 === 0) spawnObstacle();
+  obstacles.forEach(o => o.x -= speed);
+  obstacles = obstacles.filter(o => o.x + o.width > 0);
+
+  // Finish movement
+  finish.x -= speed;
+
+  // Collision with obstacles
+  obstacles.forEach(o => {
+    if (
+      player.x < o.x + o.width &&
+      player.x + player.size > o.x &&
+      player.y < o.y + o.height &&
+      player.y + player.size > o.y
+    ) {
+      endGame("💀 Game Over");
+    }
+  });
+
+  // Collision with finish
+  if (
+    player.x < finish.x + finish.width &&
+    player.x + player.size > finish.x &&
+    player.y < finish.y + finish.height &&
+    player.y + player.size > finish.y
+  ) {
+    endGame("🎉 Vyhrál jsi level!");
+  }
+}
+
+// ---- DRAW ----
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Player
+  ctx.fillStyle = "#00ffcc";
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+
+  // Obstacles
+  ctx.fillStyle = "#ff0055";
+  obstacles.forEach(o =>
+    ctx.fillRect(o.x, o.y, o.width, o.height)
+  );
+
+  // Finish
+  ctx.fillStyle = "#00ff00";
+  ctx.fillRect(finish.x, finish.y, finish.width, finish.height);
+}
+
+// ---- END ----
+function endGame(text) {
+  gameOver = true;
+  setTimeout(() => {
+    alert(text);
+    location.reload();
+  }, 100);
+}
+
+// ---- LOOP ----
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
