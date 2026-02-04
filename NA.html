@@ -1,0 +1,148 @@
+html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NHL 26 - Crosby vs Ovečkin</title>
+    <style>
+        body { background: #050505; color: white; font-family: 'Arial Black', sans-serif; text-align: center; margin: 0; overflow: hidden; }
+        canvas { background: radial-gradient(circle, #fff 60%, #e0f0ff 100%); border: 8px solid #333; border-radius: 20px; box-shadow: 0 0 80px rgba(0,100,255,0.3); cursor: none; }
+        .ui { position: absolute; width: 1000px; left: 50%; transform: translateX(-50%); top: 10px; display: flex; justify-content: space-between; z-index: 5; }
+        .score-box { background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 10px; border-bottom: 4px solid gold; font-size: 30px; }
+        #goalMsg { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 20; color: gold; text-shadow: 4px 4px 0 #000; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <div class="score-box" style="color:#FFB81C">CROSBY: <span id="sP">0</span></div>
+        <div class="score-box" style="color:#CE1126">OVEČKIN: <span id="sB">0</span></div>
+    </div>
+    <div id="goalMsg">GÓÓÓL!</div>
+    <div style="margin-top: 60px;"><canvas id="g" width="1000" height="500"></canvas></div>
+    <p>ŠIPKY: Bruslení (ICE-Q) | MEZERNÍK: Dělovka | ESC: Restart</p>
+
+<script>
+const canvas = document.getElementById("g"), c = canvas.getContext("2d");
+const goalMsg = document.getElementById("goalMsg");
+
+// Hráč a Bot (končetiny a stav)
+let p = {x: 200, y: 250, r: 22, color: "#FFB81C", speed: 6.5, angle: 0, limb: 0};
+let bot = {x: 800, y: 250, r: 22, color: "#CE1126", speed: 5, angle: 0, limb: 0};
+let gP = {x: 50, y: 250, r: 20, color: "#FFB81C"}, gB = {x: 950, y: 250, r: 20, color: "#CE1126"};
+let puck = {x: 500, y: 250, dx: 0, dy: 0, r: 10};
+let particles = [], sP = 0, sB = 0, isShooting = false, freeze = false, timer = 0;
+const keys = {};
+
+window.onkeydown = (e) => keys[e.code] = true;
+window.onkeyup = (e) => keys[e.code] = false;
+
+function createIce(x, y, power = 1) {
+    for(let i=0; i<power*5; i++) {
+        particles.push({x, y, dx: (Math.random()-0.5)*4, dy: (Math.random()-0.5)*4, life: 30});
+    }
+}
+
+function drawPlayer(u, isPlayer) {
+    c.save();
+    c.translate(u.x, u.y);
+    let lookAt = freeze ? u.angle : Math.atan2(puck.y - u.y, puck.x - u.x);
+    c.rotate(lookAt + Math.PI/2);
+
+    c.shadowBlur = 10; c.shadowColor = u.color;
+    c.fillStyle = u.color;
+    // Trup a hlava
+    c.beginPath(); c.arc(0, 0, u.r, 0, 7); c.fill();
+    c.beginPath(); c.arc(0, -u.r, u.r * 0.5, 0, 7); c.fill();
+
+    // Ruce a Nohy (animace pohybu)
+    c.strokeStyle = u.color; c.lineWidth = 6;
+    let wave = Math.sin(u.limb) * 15;
+    // Ruce
+    c.beginPath(); c.moveTo(-u.r, 0); c.lineTo(-u.r - 5, wave); c.stroke();
+    c.beginPath(); c.moveTo(u.r, 0); c.lineTo(u.r + 5, -wave); c.stroke();
+    // Hokejka
+    c.strokeStyle = "#333";
+    c.beginPath(); c.moveTo(10, 0); c.lineTo(25, 30); c.stroke();
+    c.restore();
+}
+
+function loop() {
+    if (!freeze) {
+        // Ovládání Crosbyho
+        let move = false;
+        if (keys["ArrowUp"] && p.y > 40) { p.y -= p.speed; move = true; }
+        if (keys["ArrowDown"] && p.y < 460) { p.y += p.speed; move = true; }
+        if (keys["ArrowLeft"] && p.x > 40) { p.x -= p.speed; move = true; }
+        if (keys["ArrowRight"] && p.x < 960) { p.x += p.speed; move = true; }
+        if (move) { p.limb += 0.2; createIce(p.x, p.y + 20); }
+
+        // Inteligence bota (Ovečkin)
+        if (puck.x > 450) {
+            bot.x += (puck.x - 40 - bot.x) * 0.08; bot.y += (puck.y - bot.y) * 0.08;
+            bot.limb += 0.2; createIce(bot.x, bot.y + 20);
+        } else { bot.x += (800 - bot.x) * 0.05; bot.y += (250 - bot.y) * 0.05; }
+
+        // Fyzika puku
+        puck.x += puck.dx; puck.y += puck.dy;
+        puck.dx *= 0.985; puck.dy *= 0.985;
+
+        // Kolize
+        [p, bot, gP, gB].forEach(u => {
+            let d = Math.hypot(puck.x - u.x, puck.y - u.y);
+            if (d < u.r + puck.r) {
+                let pwr = (u === p && keys["Space"]) ? 2.8 : 0.9;
+                puck.dx = (puck.x - u.x) * pwr; puck.dy = (puck.y - u.y) * pwr;
+                createIce(puck.x, puck.y, 3);
+            }
+        });
+
+        // Mantinely a Góly
+        if (puck.y < 25 || puck.y > 475) puck.dy *= -1;
+        if (puck.x < 25) { if(puck.y > 175 && puck.y < 325) { sB++; goalAnim("#CE1126"); } else puck.dx *= -1; }
+        if (puck.x > 975) { if(puck.y > 175 && puck.y < 325) { sP++; goalAnim("#FFB81C"); } else puck.dx *= -1; }
+    } else {
+        timer--;
+        p.angle += 0.2; bot.angle += 0.2;
+        if (timer <= 0) { freeze = false; reset(); }
+    }
+
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function goalAnim(col) {
+    freeze = true; timer = 120;
+    goalMsg.style.opacity = 1; goalMsg.style.color = col;
+    setTimeout(() => goalMsg.style.opacity = 0, 2000);
+}
+
+function reset() { puck = {x: 500, y: 250, dx: 0, dy: 0, r: 10}; }
+
+function draw() {
+    c.clearRect(0,0,1000,500);
+    // Hřiště a Mantinely
+    c.strokeStyle = "#444"; c.lineWidth = 20; c.strokeRect(0,0,1000,500);
+    c.strokeStyle = "rgba(255,0,0,0.2)"; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(500,0); c.lineTo(500,500); c.stroke();
+    c.strokeRect(20, 175, 40, 150); c.strokeRect(940, 175, 40, 150);
+
+    particles.forEach((part, i) => {
+        c.fillStyle = `rgba(255,255,255,${part.life/30})`;
+        c.fillRect(part.x, part.y, 3, 3);
+        part.life--; if(part.life <= 0) particles.splice(i, 1);
+    });
+
+    [p, bot, gP, gB].forEach(u => drawPlayer(u));
+    
+    c.fillStyle = keys["Space"] ? "orange" : "black";
+    c.shadowBlur = keys["Space"] ? 20 : 0; c.shadowColor = "orange";
+    c.beginPath(); c.arc(puck.x, puck.y, puck.r, 0, 7); c.fill();
+    c.shadowBlur = 0;
+
+    document.getElementById("sP").innerText = sP;
+    document.getElementById("sB").innerText = sB;
+}
+
+loop();
+</script>
+</body>
+</html>
